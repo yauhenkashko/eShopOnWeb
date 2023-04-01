@@ -39,9 +39,13 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
                            .AddDefaultTokenProviders();
 
 builder.Services.AddScoped<ITokenClaimsService, IdentityTokenClaimService>();
+builder.Services.AddAutoMapper(typeof(WebMappingProfile).Assembly);
 
 builder.Services.AddCoreServices(builder.Configuration);
 builder.Services.AddWebServices(builder.Configuration);
+
+builder.Services.Configure<DeliveryServiceConfiguration>(
+    builder.Configuration.GetRequiredSection(DeliveryServiceConfiguration.ConfigurationName));
 
 // Add memory cache services
 builder.Services.AddMemoryCache();

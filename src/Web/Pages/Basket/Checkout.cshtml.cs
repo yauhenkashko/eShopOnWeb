@@ -1,13 +1,18 @@
-﻿using Ardalis.GuardClauses;
+﻿using System.Configuration;
+using System.Text.Json;
+using Ardalis.GuardClauses;
+using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.eShopWeb.ApplicationCore.DTO;
 using Microsoft.eShopWeb.ApplicationCore.Entities.OrderAggregate;
 using Microsoft.eShopWeb.ApplicationCore.Exceptions;
 using Microsoft.eShopWeb.ApplicationCore.Interfaces;
 using Microsoft.eShopWeb.Infrastructure.Identity;
 using Microsoft.eShopWeb.Web.Interfaces;
+using Microsoft.Extensions.Options;
 
 namespace Microsoft.eShopWeb.Web.Pages.Basket;
 
@@ -20,18 +25,27 @@ public class CheckoutModel : PageModel
     private string? _username = null;
     private readonly IBasketViewModelService _basketViewModelService;
     private readonly IAppLogger<CheckoutModel> _logger;
+    private readonly HttpClient _httpClient;
+    private readonly IMapper _mapper;
+    private readonly DeliveryServiceConfiguration _deliveryConfiguration;
 
     public CheckoutModel(IBasketService basketService,
         IBasketViewModelService basketViewModelService,
         SignInManager<ApplicationUser> signInManager,
         IOrderService orderService,
-        IAppLogger<CheckoutModel> logger)
+        IAppLogger<CheckoutModel> logger,
+        HttpClient httpClient,
+        IMapper mapper,
+        IOptions<DeliveryServiceConfiguration> deliveryConfiguration)
     {
         _basketService = basketService;
         _signInManager = signInManager;
         _orderService = orderService;
         _basketViewModelService = basketViewModelService;
         _logger = logger;
+        _httpClient = httpClient;
+        _mapper = mapper;
+        _deliveryConfiguration = deliveryConfiguration.Value ?? throw new ConfigurationErrorsException();
     }
 
     public BasketViewModel BasketModel { get; set; } = new BasketViewModel();
@@ -53,9 +67,15 @@ public class CheckoutModel : PageModel
             }
 
             var updateModel = items.ToDictionary(b => b.Id.ToString(), b => b.Quantity);
+            var address = new Address("123 Main St.", "Kent", "OH", "United States", "44240");
             await _basketService.SetQuantities(BasketModel.Id, updateModel);
             await _orderService.CreateOrderAsync(BasketModel.Id, new Address("123 Main St.", "Kent", "OH", "United States", "44240"));
             await _basketService.DeleteBasketAsync(BasketModel.Id);
+
+            if (_deliveryConfiguration.Enabled)
+            {
+                await SendToDeliveryService(items, address);
+            }
         }
         catch (EmptyBasketOnCheckoutException emptyBasketOnCheckoutException)
         {
@@ -65,6 +85,18 @@ public class CheckoutModel : PageModel
         }
 
         return RedirectToPage("Success");
+    }
+
+    private async Task SendToDeliveryService(IEnumerable<BasketItemViewModel> items, Address address)
+    {
+        var deliveryDetails = _mapper.Map<IEnumerable<BasketItemViewModel>, DeliveryDetailsDto>(items);
+        deliveryDetails.DeliveryAddress = address;
+        deliveryDetails.Id = Guid.NewGuid();
+
+        var content = new StringContent(JsonSerializer.Serialize(deliveryDetails), System.Text.Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync(_deliveryConfiguration.DeliveryServiceUrl, content);
+
+        response.EnsureSuccessStatusCode();
     }
 
     private async Task SetBasketModelAsync()
