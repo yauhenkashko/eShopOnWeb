@@ -2,6 +2,7 @@
 using System.Text.Json;
 using Ardalis.GuardClauses;
 using AutoMapper;
+using Azure.Messaging.ServiceBus;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -28,6 +29,7 @@ public class CheckoutModel : PageModel
     private readonly HttpClient _httpClient;
     private readonly IMapper _mapper;
     private readonly DeliveryServiceConfiguration _deliveryConfiguration;
+    private readonly ReserverServiceConfiguration _reserverConfiguration;
 
     public CheckoutModel(IBasketService basketService,
         IBasketViewModelService basketViewModelService,
@@ -36,7 +38,8 @@ public class CheckoutModel : PageModel
         IAppLogger<CheckoutModel> logger,
         HttpClient httpClient,
         IMapper mapper,
-        IOptions<DeliveryServiceConfiguration> deliveryConfiguration)
+        IOptions<DeliveryServiceConfiguration> deliveryConfiguration,
+        IOptions<ReserverServiceConfiguration> reserverConfiguration)
     {
         _basketService = basketService;
         _signInManager = signInManager;
@@ -46,6 +49,7 @@ public class CheckoutModel : PageModel
         _httpClient = httpClient;
         _mapper = mapper;
         _deliveryConfiguration = deliveryConfiguration.Value ?? throw new ConfigurationErrorsException();
+        _reserverConfiguration = reserverConfiguration.Value ?? throw new ConfigurationErrorsException();
     }
 
     public BasketViewModel BasketModel { get; set; } = new BasketViewModel();
@@ -72,9 +76,17 @@ public class CheckoutModel : PageModel
             await _orderService.CreateOrderAsync(BasketModel.Id, new Address("123 Main St.", "Kent", "OH", "United States", "44240"));
             await _basketService.DeleteBasketAsync(BasketModel.Id);
 
+            var deliveryDetails = _mapper.Map<IEnumerable<BasketItemViewModel>, DeliveryDetailsDto>(items);
+            deliveryDetails.DeliveryAddress = address;
+
+            if (_reserverConfiguration.Enabled)
+            {
+                await SendToReserverService(deliveryDetails);
+            }
+
             if (_deliveryConfiguration.Enabled)
             {
-                await SendToDeliveryService(items, address);
+                await SendToDeliveryService(deliveryDetails);
             }
         }
         catch (EmptyBasketOnCheckoutException emptyBasketOnCheckoutException)
@@ -87,12 +99,16 @@ public class CheckoutModel : PageModel
         return RedirectToPage("Success");
     }
 
-    private async Task SendToDeliveryService(IEnumerable<BasketItemViewModel> items, Address address)
+    private async Task SendToReserverService(DeliveryDetailsDto deliveryDetails)
     {
-        var deliveryDetails = _mapper.Map<IEnumerable<BasketItemViewModel>, DeliveryDetailsDto>(items);
-        deliveryDetails.DeliveryAddress = address;
-        deliveryDetails.Id = Guid.NewGuid();
+        var queueClient = new ServiceBusClient(_reserverConfiguration.ConnectionString);
+        var sender = queueClient.CreateSender(_reserverConfiguration.QueueName);
+        var json = JsonSerializer.Serialize(deliveryDetails);
+        await sender.SendMessageAsync(new ServiceBusMessage(json));
+    }
 
+    private async Task SendToDeliveryService(DeliveryDetailsDto deliveryDetails)
+    {
         var content = new StringContent(JsonSerializer.Serialize(deliveryDetails), System.Text.Encoding.UTF8, "application/json");
         var response = await _httpClient.PostAsync(_deliveryConfiguration.DeliveryServiceUrl, content);
 

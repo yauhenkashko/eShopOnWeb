@@ -47,6 +47,9 @@ builder.Services.AddWebServices(builder.Configuration);
 builder.Services.Configure<DeliveryServiceConfiguration>(
     builder.Configuration.GetRequiredSection(DeliveryServiceConfiguration.ConfigurationName));
 
+builder.Services.Configure<ReserverServiceConfiguration>(
+    builder.Configuration.GetRequiredSection(ReserverServiceConfiguration.ConfigurationName));
+
 // Add memory cache services
 builder.Services.AddMemoryCache();
 builder.Services.AddRouting(options =>

@@ -6,7 +6,7 @@ namespace Microsoft.eShopWeb.ApplicationCore.DTO;
 
 public class DeliveryDetailsDto
 {
-    public Guid Id { get; set; }
+    public Guid Id { get; set; } = Guid.NewGuid();
     public List<DeliveryItemDto> Items { get; set; }
     public Address? DeliveryAddress { get; set; }
 }
