@@ -1,0 +1,1 @@
+az acr task create --registry <ACR REGISTRY NAME> --name <TASK NAME> --image <YOUR IMAGE NAME>:{{.Run.ID}} --context <REPOSITORY>#<BRANCH> --file src/Web/Dockerfile --git-access-token <PERSONAL ACCESS TOKEN>

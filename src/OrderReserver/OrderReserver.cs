@@ -4,7 +4,6 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs;
-using Microsoft.Azure.Amqp.Framing;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Logging;
 
@@ -14,7 +13,7 @@ namespace OrderReserver
     {
         private readonly ILogger _log;
 
-        public OrderReserver(ILogger log)
+        public OrderReserver(ILogger<OrderReserver> log)
         {
             _log = log;
         }
