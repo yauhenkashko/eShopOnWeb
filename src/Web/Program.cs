@@ -45,10 +45,10 @@ builder.Services.AddCoreServices(builder.Configuration);
 builder.Services.AddWebServices(builder.Configuration);
 
 builder.Services.Configure<DeliveryServiceConfiguration>(
-    builder.Configuration.GetRequiredSection(DeliveryServiceConfiguration.ConfigurationName));
+    builder.Configuration.GetSection(DeliveryServiceConfiguration.ConfigurationName));
 
 builder.Services.Configure<ReserverServiceConfiguration>(
-    builder.Configuration.GetRequiredSection(ReserverServiceConfiguration.ConfigurationName));
+    builder.Configuration.GetSection(ReserverServiceConfiguration.ConfigurationName));
 
 // Add memory cache services
 builder.Services.AddMemoryCache();
